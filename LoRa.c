@@ -1,6 +1,7 @@
-#include <pigpio.h>
+#include "mygpio.h"
 
 #include "LoRa.h"
+#include "mySPI.h"
 
 int LoRa_begin(LoRa_ctl *modem) {
 	if (gpioInitialise() < 0)
