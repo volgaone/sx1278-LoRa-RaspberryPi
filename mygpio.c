@@ -47,7 +47,6 @@ int gpioSetMode(unsigned gpio, unsigned mode)
         gpiod_line_release(line);
         return -1;
     }
-    gpiod_line_release(line);
     return 0; // Assuming success for now
 }
 int gpioWrite(unsigned gpio, unsigned level)
@@ -78,9 +77,46 @@ int gpioInitialise(void)
 int gpioSetISRFunc(
     unsigned gpio, unsigned edge, int timeout, gpioISRFunc_t f)
 {
+    struct gpiod_line *line;
+    int ret;
+    struct timespec ts = {10, 0}; // 10 seconds timeout
     printf("gpioSetISRFunc called with gpio: %u, edge: %u, timeout: %d\n", gpio, edge, timeout);
-    // Here you would typically set the ISR function for the GPIO pin
-    // For now, we just return success
+    line = gpiod_chip_get_line(chip, gpio);
+    if (!line)
+    {
+        printf("Get line failed\n");
+        ret = -1;
+    }
+
+    ret = gpiod_line_request_rising_edge_events(line, CONSUMER);
+    if (ret < 0)
+    {
+        printf("Request event notification failed\n");
+        ret = -1;
+    }
+
+    ret = gpiod_line_event_wait(line, &ts);
+    if (ret < 0)
+    {
+        printf("Wait event notification failed\n");
+        ret = -1;
+    }
+    else if (ret == 0)
+    {
+        printf("Wait event notification on line #%u timeout\n", gpio);
+    }
+    else if (ret == 0)
+    {
+        struct gpiod_line_event event;
+        ret = gpiod_line_event_read(line, &event);
+        printf("Get event notification on line #%u\n", gpio);
+        if (ret < 0)
+        {
+            printf("Read last event notification failed\n");
+            ret = -1;
+        }
+    }
+
     return 0; // Assuming success for now
 }
 
@@ -88,6 +124,7 @@ typedef struct line_wait_args
 {
     struct gpiod_line *line;
     struct timespec *ts;
+    int edge;
     int ret;
 } line_wait_args;
 
@@ -105,6 +142,55 @@ static void *run(void *arg)
     {
         printf("Wait event notification on line #%u timeout\n", gpiod_line_offset(args->line));
     }
+    else
+    {
+        struct gpiod_line_event event;
+        ret = gpiod_line_event_read(args->line, &event);
+        printf("Get event notification on line #%u\n", gpiod_line_offset(args->line));
+        if (ret < 0)
+        {
+            printf("Read last event notification failed\n");
+            ret = -1;
+        }
+    }
+    args->ret = ret;
+    return NULL;
+}
+
+static void *run_manual_line_read(void *arg)
+{
+    time_t rawtime;
+    struct tm *timeinfo;
+
+    time(&rawtime);
+    timeinfo = localtime(&rawtime);
+    printf("Current local time and date: %s", asctime(timeinfo));
+    line_wait_args *args = (line_wait_args *)arg;
+    printf("Manually waiting for event on line #%u\n", gpiod_line_offset(args->line));
+    int ret;
+    if (args->edge == RISING_EDGE)
+    {
+        while (gpiod_line_get_value(args->line) == 0)
+        {
+            // just hang in here and wait
+        }
+        printf("Rising edge detected on line #%u\n", gpiod_line_offset(args->line));
+    }
+    else if (args->edge == FALLING_EDGE)
+    {
+        while (gpiod_line_get_value(args->line) == 1)
+        {
+            // just hang in here and wait
+        }
+        printf("Falling edge detected on line #%u\n", gpiod_line_offset(args->line));
+    }
+    else
+    {
+        printf("Invalid edge %u for GPIO %u\n", args->edge, gpiod_line_offset(args->line));
+        args->ret = -1;
+        return NULL;
+    }
+    gpiod_line_get_value(args->line);
     args->ret = ret;
     return NULL;
 }
@@ -126,46 +212,49 @@ int gpioSetISRFuncEx(
         return -1;
     }
 
-    if (edge == RISING_EDGE)
-    {
-        ret = gpiod_line_request_rising_edge_events(line, CONSUMER);
-        printf("Request rising edge events on line #%u\n", gpiod_line_offset(line));
-    }
-    else if (edge == FALLING_EDGE)
-    {
-        ret = gpiod_line_request_falling_edge_events(line, CONSUMER);
-        printf("Request falling edge events on line #%u\n", gpiod_line_offset(line));
-    }
-    else
-    {
-        printf("Invalid edge %u for GPIO %u\n", edge, gpio);
-        gpiod_line_release(line);
-        return -1;
-    }
-    if (ret < 0)
-    {
-        printf("Request event notification failed\n");
-        gpiod_line_release(line);
-        return -1;
-    }
-    //we can't be allocating this on the stack because it will be used in a thread
-    //and the thread will be using it after this function returns
+    // if (edge == RISING_EDGE)
+    // {
+    //     ret = gpiod_line_request_rising_edge_events(line, CONSUMER);
+    //     printf("Request rising edge events on line #%u\n", gpiod_line_offset(line));
+    // }
+    // else if (edge == FALLING_EDGE)
+    // {
+    //     ret = gpiod_line_request_falling_edge_events(line, CONSUMER);
+    //     printf("Request falling edge events on line #%u\n", gpiod_line_offset(line));
+    // }
+    // else
+    // {
+    //     printf("Invalid edge %u for GPIO %u\n", edge, gpio);
+    //     gpiod_line_release(line);
+    //     return -1;
+    // }
+    // if (ret < 0)
+    // {
+    //     printf("Request event notification failed\n");
+    //     gpiod_line_release(line);
+    //     return -1;
+    // }
+    // we can't be allocating this on the stack because it will be used in a thread
+    // and the thread will be using it after this function returns
     line_wait_args *args = malloc(sizeof(line_wait_args));
-    if (!args) {
+    if (!args)
+    {
         printf("Failed to allocate memory for line_wait_args\n");
         return -1;
     }
     args->line = line;
     struct timespec *ts = malloc(sizeof(struct timespec));
-    if (!ts) {
+    if (!ts)
+    {
         printf("Failed to allocate memory for timespec\n");
         free(args);
         return -1;
     }
     *ts = (struct timespec){10, 0}; // 10 seconds timeout
     args->ts = ts;
+    args->edge = edge;
     pthread_t thread;
-    pthread_create(&thread, NULL, run, (void*)args);
+    pthread_create(&thread, NULL, run_manual_line_read, (void *)args);
     pthread_join(thread, NULL);
 
     return 0; // Assuming success for now
