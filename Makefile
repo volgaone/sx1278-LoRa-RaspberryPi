@@ -2,12 +2,12 @@
 all: transmit_explicit
 
 mySPI.o: mySPI.c
-	gcc -c mySPI.c -o mySPI.o -lrt -pthread -lm
+	gcc -c mySPI.c -o mySPI.o -lrt -pthread  -lm
 myGPIO.o: mygpio.c
 	gcc -c mygpio.c -o mygpio.o -lrt -pthread -lm
 
-LoRa.o: mygpio.o mySPI.o LoRa.c
-	gcc -c LoRa.c -o LoRa.o mygpio.o mySPI.o -lrt -pthread -lm
+LoRa.o: LoRa.c
+	gcc -c LoRa.c -o LoRa.o -lrt -pthread -lm
 
 
 # tx_implicit_example.o: tx_implicit_example.c
@@ -34,8 +34,8 @@ tx_explicit_example.o: tx_explicit_example.c
 # pong: LoRa.o pong.o
 # 	gcc -o pong pong.o LoRa.o  -lrt -pthread -lm
 	
-transmit_explicit: LoRa.o tx_explicit_example.o
-	gcc -o transmit_explicit tx_explicit_example.o LoRa.o mygpio.o mySPI.o  -lrt -pthread -lm
+transmit_explicit: LoRa.o tx_explicit_example.o mySPI.o  mygpio.o
+	gcc -o transmit_explicit tx_explicit_example.o LoRa.o mygpio.o mySPI.o  -lrt -pthread -lm -lwiringPi -lgpiod
 
 # transmit_implicit: LoRa.o tx_implicit_example.o
 # 	gcc -o transmit_implicit tx_implicit_example.o LoRa.o  -lrt -pthread -lm
