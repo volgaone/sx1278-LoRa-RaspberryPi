@@ -1,6 +1,7 @@
 #include "mySPI.h"
 #include <stdio.h>
 #include <wiringPiSPI.h>
+#include <string.h>
 
 int ch = -1;
 
