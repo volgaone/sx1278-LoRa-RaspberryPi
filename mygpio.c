@@ -4,6 +4,7 @@
 #include <pthread.h>
 #include <inttypes.h>
 #include "stdint.h"
+#include <sys/time.h>
 
 #ifndef CONSUMER
 #define CONSUMER "Consumer"
@@ -160,11 +161,15 @@ static void *run(void *arg)
 static void *run_manual_line_read(void *arg)
 {
     time_t rawtime;
+    struct timeval rawtime1, rawtime2;
     struct tm *timeinfo;
 
+    gettimeofday(&rawtime1, 0);
     time(&rawtime);
     timeinfo = localtime(&rawtime);
-    printf("Current local time and date: %s", asctime(timeinfo));
+    printf("Current local time and date: %s\n", asctime(timeinfo));
+    gettimeofday(&rawtime2, 0);
+    printf("Smallest unit of time is %uus\n", rawtime2.tv_usec-rawtime1.tv_usec);
     line_wait_args *args = (line_wait_args *)arg;
     printf("Manually waiting for event on line #%u\n", gpiod_line_offset(args->line));
     int ret;
