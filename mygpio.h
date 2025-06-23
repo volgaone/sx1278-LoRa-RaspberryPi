@@ -1,3 +1,5 @@
+#include <pthread.h>
+
 #define PI_INPUT 1
 #define PI_OUTPUT 0
 #define RISING_EDGE 2
@@ -22,4 +24,6 @@ int gpioSetISRFuncEx(
     unsigned edge,
     int timeout,
     gpioISRFuncEx_t f,
-    void *userdata);
+    void *userdata,
+    pthread_t *thread
+);

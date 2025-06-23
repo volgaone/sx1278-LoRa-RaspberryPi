@@ -2,6 +2,9 @@
 
 #include "LoRa.h"
 #include "mySPI.h"
+#include <pthread.h>
+
+pthread_t thread = 0;
 
 int LoRa_begin(LoRa_ctl *modem) {
 	if (gpioInitialise() < 0)
@@ -113,12 +116,12 @@ void lora_set_dio_tx_mapping(int spid){
 
 void lora_set_rxdone_dioISR(int gpio_n, rxDoneISR func, LoRa_ctl *modem){
 	gpioSetMode(gpio_n, PI_INPUT);
-	gpioSetISRFuncEx(gpio_n, RISING_EDGE, 0, func, (void *)modem);
+	gpioSetISRFuncEx(gpio_n, RISING_EDGE, 0, func, (void *)modem, &thread);
 }
 
 void lora_set_txdone_dioISR(int gpio_n, txDoneISR func, LoRa_ctl *modem){
 	gpioSetMode(gpio_n, PI_INPUT);
-	gpioSetISRFuncEx(gpio_n, RISING_EDGE, 0, func, (void *)modem);
+	gpioSetISRFuncEx(gpio_n, RISING_EDGE, 0, func, (void *)modem, &thread);
 }
 
 void lora_remove_dioISR(int gpio_n){
@@ -250,7 +253,12 @@ void LoRa_end(LoRa_ctl *modem){
 	modem->spid =-1;
 }
 
-void LoRa_stop_receive(LoRa_ctl *modem){
+void LoRa_stop_receive(LoRa_ctl *modem)
+{
+	if (thread != 0)
+	{
+		pthread_join(thread, NULL);
+	}
 	lora_remove_dioISR(modem->eth.dio0GpioN);
 	lora_set_satandby_mode(modem->spid);
 }

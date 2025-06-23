@@ -163,31 +163,74 @@ static void *run_manual_line_read(void *arg)
     time_t rawtime;
     struct timeval rawtime1, rawtime2;
     struct tm *timeinfo;
+    bool timeout = false;
+    struct timespec ts_wait_step = {
+        .tv_sec = 0,
+        .tv_nsec = 1000};
+    unsigned long int last_seconds_value;
 
-    gettimeofday(&rawtime1, 0);
+    gettimeofday(&rawtime1, NULL);
     time(&rawtime);
     timeinfo = localtime(&rawtime);
     printf("Current local time and date: %s\n", asctime(timeinfo));
-    gettimeofday(&rawtime2, 0);
-    printf("Smallest unit of time is %uus\n", rawtime2.tv_usec-rawtime1.tv_usec);
     line_wait_args *args = (line_wait_args *)arg;
-    printf("Manually waiting for event on line #%u\n", gpiod_line_offset(args->line));
+    printf("Manually waiting for event on line #%u for %u seconds\n", gpiod_line_offset(args->line), args->ts->tv_sec);
     int ret;
     if (args->edge == RISING_EDGE)
     {
         while (gpiod_line_get_value(args->line) == 0)
         {
-            // just hang in here and wait
+            nanosleep(&ts_wait_step, 0); // Sleep for 1000 microseconds
+            gettimeofday(&rawtime2, NULL);
+
+            unsigned long int delta_time_us = rawtime2.tv_usec - rawtime1.tv_usec;
+            unsigned long int delta_time_sec = rawtime2.tv_sec - rawtime1.tv_sec;
+            if (delta_time_sec != last_seconds_value)
+            {
+                last_seconds_value = delta_time_sec;
+                printf("Current delta time: %ld seconds\n", delta_time_sec);
+            }
+            // printf("Current time delta: %u %u\n", delta_time_us, delta_time_sec);
+            if (args->ts->tv_sec == 0)
+            {
+                if (delta_time_us > args->ts->tv_nsec / 1000)
+                {
+                    printf("Timeout delta is %u us\n", delta_time_us);
+                    timeout = true;
+                    break;
+                }
+            }
+            else if (args->ts->tv_sec > 0)
+            {
+                if (delta_time_sec >= args->ts->tv_sec)
+                {
+                    printf("Timeout delta is %u seconds\n", delta_time_sec);
+                    timeout = true;
+                    break;
+                }
+            }
         }
-        printf("Rising edge detected on line #%u\n", gpiod_line_offset(args->line));
+        if (!timeout)
+            printf("Rising edge detected on line #%u\n", gpiod_line_offset(args->line));
+        else
+            printf("Timeout waiting for rising edge on line #%u\n", gpiod_line_offset(args->line));
     }
     else if (args->edge == FALLING_EDGE)
     {
         while (gpiod_line_get_value(args->line) == 1)
         {
-            // just hang in here and wait
+            gettimeofday(&rawtime2, 0);
+            uint64_t delta_time = rawtime2.tv_usec - rawtime1.tv_usec;
+            if (delta_time > args->ts->tv_sec * 1000000 + args->ts->tv_nsec / 1000)
+            {
+                timeout = true;
+                break;
+            }
         }
-        printf("Falling edge detected on line #%u\n", gpiod_line_offset(args->line));
+        if (!timeout)
+            printf("Falling edge detected on line #%u\n", gpiod_line_offset(args->line));
+        else
+            printf("Timeout waiting for falling edge on line #%u\n", gpiod_line_offset(args->line));
     }
     else
     {
@@ -195,8 +238,8 @@ static void *run_manual_line_read(void *arg)
         args->ret = -1;
         return NULL;
     }
-    gpiod_line_get_value(args->line);
     args->ret = ret;
+    printf("THREAD FINISHED\n");
     return NULL;
 }
 
@@ -205,7 +248,8 @@ int gpioSetISRFuncEx(
     unsigned edge,
     int timeout,
     gpioISRFuncEx_t f,
-    void *userdata)
+    void *userdata,
+    pthread_t *thread)
 {
     struct gpiod_line *line;
     int ret;
@@ -255,12 +299,12 @@ int gpioSetISRFuncEx(
         free(args);
         return -1;
     }
-    *ts = (struct timespec){10, 0}; // 10 seconds timeout
+    *ts = (struct timespec){5, 0}; // 10 seconds timeout
     args->ts = ts;
     args->edge = edge;
-    pthread_t thread;
-    pthread_create(&thread, NULL, run_manual_line_read, (void *)args);
-    pthread_join(thread, NULL);
+    
+    pthread_create(thread, NULL, run_manual_line_read, (void *)args);
+    //pthread_join(thread, NULL);
 
     return 0; // Assuming success for now
 }
