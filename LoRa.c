@@ -52,6 +52,15 @@ int LoRa_begin(LoRa_ctl *modem) {
 	lora_reg_write_byte(modem->spid, REG_DETECTION_THRESHOLD, 0x0a);//DetectionThreshold for SF > 6
 
 	lora_set_freq(modem->spid, modem->eth.freq);
+	if (LoRa_check_conn(modem))
+	{
+		printf("LoRa chip connected\n");
+	}
+	else
+	{
+		printf("LoRa chip not connected\n");
+		return -1;
+	}
 	return modem->spid;
 }
 

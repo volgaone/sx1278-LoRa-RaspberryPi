@@ -304,7 +304,6 @@ int gpioSetISRFuncEx(
     args->edge = edge;
     
     pthread_create(thread, NULL, run_manual_line_read, (void *)args);
-    //pthread_join(thread, NULL);
 
     return 0; // Assuming success for now
 }

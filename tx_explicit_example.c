@@ -13,14 +13,14 @@ int main(){
     modem.spiCS = 0;//Raspberry SPI CE pin number
     modem.tx.callback = tx_f;
     modem.tx.data.buf = txbuf;
-    memcpy(modem.tx.data.buf, "LoRa", 5);//copy data we'll sent to buffer
-    modem.tx.data.size = 5;//Payload len
+    memcpy(modem.tx.data.buf, "Jade is cool", 13);//copy data we'll sent to buffer
+    modem.tx.data.size = 13;//Payload len
     modem.eth.preambleLen=6;
     modem.eth.bw = BW62_5;//Bandwidth 62.5KHz
     modem.eth.sf = SF12;//Spreading Factor 12
     modem.eth.ecr = CR8;//Error coding rate CR4/8
     modem.eth.CRC = 1;//Turn on CRC checking
-    modem.eth.freq = 434800000;// 434.8MHz
+    modem.eth.freq = 868E6;// to match the patch antenna I bought
     modem.eth.resetGpioN = 4;//GPIO4 on lora RESET pin
     modem.eth.dio0GpioN = 17;//GPIO17 on lora DIO0 pin to control Rxdone and Txdone interrupts
     modem.eth.outPower = OP20;//Output power
