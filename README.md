@@ -1,84 +1,55 @@
-<p># sx1278-LoRa-RaspberryPi</p>
-<h1>Library to work with sx1278 LoRa chips on Raspberry pi</h1>
-<h2>It's just for P2P transmissions. Not for LoRaWAN.</h2>
-<p><br /> May work with all sx127x chips, i didn't test it on these chips</p>
-<p>This source uses libpigpio. Installation on raspbian: <strong><em>apt install pigpio</em></strong>&nbsp;</p>
-<p><strong><em>Quick start:</em></strong></p>
+# sx1278-LoRa-RaspberryPi
+## Library to work with sx1278 LoRa chips on Raspberry pi
+### It's just for P2P transmissions. Not for LoRaWAN.
 
-<p>0. <em>apt install pigpio</em></p>
-<p>1. Wire raspberry and lora chip by the table below</p>
-<table style="height: 170px;" width="232">
-<tbody>
-<tr>
-<td style="width: 70px;">raspi</td>
-<td style="width: 70px;">&nbsp;</td>
-<td style="width: 70px;">LoRa</td>
-</tr>
-<tr>
-<td style="width: 70px;">GPIO4, pin 7</td>
-<td style="width: 70px;">&nbsp;</td>
-<td style="width: 70px;">RESET</td>
-</tr>
-<tr>
-<td style="width: 70px;">GPIO17, pin 11</td>
-<td style="width: 70px;">&nbsp;</td>
-<td style="width: 70px;">DIO0</td>
-</tr>
-<tr>
-<td style="width: 70px;">MOSI (GPIO10, pin 19)</td>
-<td style="width: 70px;">&nbsp;</td>
-<td style="width: 70px;">MOSI</td>
-</tr>
-<tr>
-<td style="width: 70px;">MISO (GPIO9, pin 21)</td>
-<td style="width: 70px;">&nbsp;</td>
-<td style="width: 70px;">MISO</td>
-</tr>
-<tr>
-<td style="width: 70px;">CLK (GPIO11, pin 23)</td>
-<td style="width: 70px;">&nbsp;</td>
-<td style="width: 70px;">SCK</td>
-</tr>
-<tr>
-<td style="width: 70px;">SPI_CE0 (GPIO8, pin 24)</td>
-<td style="width: 70px;">&nbsp;</td>
-<td style="width: 70px;">NSS</td>
-</tr>
-</tbody>
-</table>
-<p>2. Clone the repo</p>
-<p>3. Enter cloned repo dir</p>
-<p>4. <em>make</em></p>
-<p>5. Try files under sudo: <em>transmit_explicit, transmit_implicit, receive_explicit, receive_implicit</em></p>
-<p>All transmitt examples just ones send "LoRa" string with its '\0' terminating byte.</p>
+May work with all sx127x chips, I didn't test it on these chips
 
-<h3><strong>API:</strong></h3>
 
-<ul style="list-style-type: disc;">
-<li style="text-align: left;"><strong>int LoRa_begin(LoRa_ctl *modem) -</strong> Configures radio module. Returns spi handle &gt;= 0 if OK, otherwise error number &lt; 0</li>
-</ul>
-<ul style="list-style-type: disc;">
-<li style="text-align: left;"><strong>void LoRa_send(LoRa_ctl *modem) - </strong>Commands radio module to send&nbsp; data from buffer</li>
-<li style="text-align: left;"><strong>void LoRa_receive(LoRa_ctl *modem) - </strong>Commands radio module to switch to continuous receive mode</li>
-<li style="text-align: left;"><strong>void LoRa_calculate_packet_t(LoRa_ctl *modem) - </strong>Calculates onair time, payload symbols and other fields.</li>
-<li style="text-align: left;"><strong>_Bool LoRa_check_conn(LoRa_ctl *modem) - </strong>Checks connection with module. Return True/False</li>
-<li style="text-align: left;"><strong>void LoRa_end(LoRa_ctl *modem) - </strong>Ends up working with module. Switches to sleep mode, closes spi and so on.</li>
-<li style="text-align: left;"><strong>void LoRa_stop_receive(LoRa_ctl *modem) -&nbsp;</strong>Removes callback from IRQ pin, switches module to idle mode.</li>
-<li style="text-align: left;"><strong>void LoRa_sleep(LoRa_ctl *modem) - </strong>Switches module to sleep mode</li>
-<li style="text-align: left;"><strong>unsigned char LoRa_get_op_mode(LoRa_ctl *modem)</strong> -<strong>&nbsp;</strong>Returns current module operational mode - SLEEP_MODE, RXCONT_MODE, SLEEP_MODE, STDBY_MODE</li>
-</ul>
-<ul style="list-style-type: disc;">
-<li style="text-align: left;"><strong>struct&nbsp;LoRa_ctl - </strong>view LoRa.h</li>
-</ul>
+This has been tested on Raspberry Pi 5 hardware. It will not work on earlier versions of RPI hardware,
+because previous versions use a different hardware chip, and require `libpigpio` library. On the other hand,
+RPI5 uses `gpiod` library for simple IO manipulation, and `wiringPiSPI` library for SPI transfers.
+If you'd like to test this code on earlier versions of RPI (3 & 4), go to this [repo](https://github.com/YandievRuslan/sx1278-LoRa-RaspberryPi) 
 
-<h3><strong>Notice:</strong></h3>
+Quick start:
 
-<p><span class="pl-k">Function </span><em><span style="color: #0000ff;"> <span class="pl-en">void LoRa_receive(LoRa_ctl *modem)</span></span></em> uses continuous mode on module. Radio module will continiuously receive packets and each time execute user callback. It's in case you need to exchange data larger than 255 bytes(FIFO buffer). You have to manually stop receiving by&nbsp;<span style="color: #0000ff;"><em><span class="pl-k">void</span> <span class="pl-en">LoRa_stop_receive</span>(LoRa_ctl *modem)</em>.</span></p>
+1. Wire a Raspberry Pi 5 and LoRa chip according to the table below
 
-<h3><strong>15.01.2019 update</strong></h3>
+| raspi                   |   | LoRa  |
+|-------------------------|---|-------|
+| GPIO4, pin 7            |   | RESET |
+| GPIO17, pin 11          |   | DIO0  |
+| MOSI (GPIO10, pin 19)   |   | MOSI  |
+| MISO (GPIO9, pin 21)    |   | MISO  |
+| CLK (GPIO11, pin 23)    |   | SCK   |
+| SPI_CE0 (GPIO8, pin 24) |   | NSS   |
 
-<p>Updated library to handle radio module from user Rx\Tx callbacks. Backward compatibility retained.</p>
-<p>Now you can start sending data from Rx callback, or vice versa, or any other operation with radio module.</p>
-<p>New examples "ping.c" and "pong.c" to explain new features. Make, then execute on different devices first "pong" then "ping".</p>
+2. Clone the repo
+3. Enter cloned repo dir
+4. `make`
+5. Try files under sudo: `transmit_explicit`, `transmit_implicit`, `receive_explicit`, `receive_implicit`
+All transmit examples just ones send "LoRa" string with its '\0' terminating byte.
 
-<strong>Supported by <a href="http://zaoitt.ru/">ITT ltd</a>&nbsp;</strong>
+### API:
+
+- `int LoRa_begin(LoRa_ctl *modem)` - Configures radio module. Returns SPI handle= 0 if OK, otherwise error number 0
+- `void LoRa_send(LoRa_ctl *modem)` -Commands radio module to send data from buffer
+- `void LoRa_receive(LoRa_ctl *modem)` -Commands radio module to switch to continuous receive mode
+- `void LoRa_calculate_packet_t(LoRa_ctl *modem)` - Calculates on-air time, payload symbols and other fields.
+- `_Bool LoRa_check_conn(LoRa_ctl *modem)` -Checks connection with module. Return True/False
+- `void LoRa_end(LoRa_ctl *modem)` - Ends up working with module. Switches to sleep mode, closes SPI and so on.
+- `void LoRa_stop_receive(LoRa_ctl *modem)` - Removes callback from IRQ pin, switches module to idle mode.
+- `void LoRa_sleep(LoRa_ctl *modem)` - Switches module to sleep mode
+- `unsigned char LoRa_get_op_mode(LoRa_ctl *modem)` Returns current module operational mode - SLEEP_MODE, RXCONT_MODE, SLEEP_MODE, STDBY_MODE
+
+
+### Notice:
+
+Function void LoRa_receive(LoRa_ctl *modem) uses continuous mode on module. Radio module will continuously receive packets and each time execute user callback. It's in case you need to exchange data larger than 255 bytes(FIFO buffer). You have to manually stop receiving by void LoRa_stop_receive(LoRa_ctl *modem)
+
+### 15.01.2019 update
+
+Updated library to handle radio module from user Rx\Tx callbacks. Backward compatibility retained.
+Now you can start sending data from Rx callback, or vice versa, or any other operation with radio module.
+New examples "ping.c" and "pong.c" to explain new features. Make, then execute on different devices first "pong" then "ping"
+
+Supported by [ITT ltd](http://zaoitt.ru/)
