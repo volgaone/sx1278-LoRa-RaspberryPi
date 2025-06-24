@@ -14,7 +14,6 @@ struct gpiod_chip *chip;
 
 int gpioSetMode(unsigned gpio, unsigned mode)
 {
-    printf("gpioSetMode called with gpio: %u, mode: %u\n", gpio, mode);
     struct gpiod_line *line;
     line = gpiod_chip_get_line(chip, gpio);
     if (!line)
@@ -59,7 +58,6 @@ int gpioWrite(unsigned gpio, unsigned level)
         printf("Could not set value %u on line #%u\n", level, gpio);
         gpiod_line_release(line);
     }
-    printf("Output %u on line #%u\n", level, gpio);
     return 0; // Assuming success for now
 }
 int gpioInitialise(void)
@@ -71,7 +69,6 @@ int gpioInitialise(void)
         printf("Open chip %s failed\n", chipname);
         return -1;
     }
-    printf("gpioInitialise called successfully\n");
     return 0;
 }
 
@@ -170,11 +167,8 @@ static void *run_manual_line_read(void *arg)
     unsigned long int last_seconds_value;
 
     gettimeofday(&rawtime1, NULL);
-    time(&rawtime);
-    timeinfo = localtime(&rawtime);
-    printf("Current local time and date: %s\n", asctime(timeinfo));
     line_wait_args *args = (line_wait_args *)arg;
-    printf("Manually waiting for event on line #%u for %u seconds\n", gpiod_line_offset(args->line), args->ts->tv_sec);
+    //printf("Manually waiting for event on line #%u for %u seconds\n", gpiod_line_offset(args->line), args->ts->tv_sec);
     int ret;
     if (args->edge == RISING_EDGE)
     {
@@ -188,14 +182,12 @@ static void *run_manual_line_read(void *arg)
             if (delta_time_sec != last_seconds_value)
             {
                 last_seconds_value = delta_time_sec;
-                printf("Current delta time: %ld seconds\n", delta_time_sec);
             }
             // printf("Current time delta: %u %u\n", delta_time_us, delta_time_sec);
             if (args->ts->tv_sec == 0)
             {
                 if (delta_time_us > args->ts->tv_nsec / 1000)
                 {
-                    printf("Timeout delta is %u us\n", delta_time_us);
                     timeout = true;
                     break;
                 }
@@ -204,7 +196,6 @@ static void *run_manual_line_read(void *arg)
             {
                 if (delta_time_sec >= args->ts->tv_sec)
                 {
-                    printf("Timeout delta is %u seconds\n", delta_time_sec);
                     timeout = true;
                     break;
                 }
@@ -239,7 +230,6 @@ static void *run_manual_line_read(void *arg)
         return NULL;
     }
     args->ret = ret;
-    printf("THREAD FINISHED\n");
     return NULL;
 }
 
