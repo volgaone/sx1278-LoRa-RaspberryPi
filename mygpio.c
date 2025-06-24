@@ -1,75 +1,69 @@
+/*
+-- Installing: /usr/local/lib/libgpiolib.a
+-- Installing: /usr/local/include/gpiolib.h
+*/
 #include "mygpio.h"
+#include <gpiolib.h>
 #include <stdio.h>
-#include <gpiod.h>
 #include <pthread.h>
 #include <inttypes.h>
 #include "stdint.h"
 #include <sys/time.h>
+#include <stdlib.h>
+#include <stdbool.h>
 
-#ifndef CONSUMER
-#define CONSUMER "Consumer"
-#endif
-
-struct gpiod_chip *chip;
+static void verbose_callback(const char *msg)
+{
+    printf("%s", msg);
+}
 
 int gpioSetMode(unsigned gpio, unsigned mode)
 {
-    struct gpiod_line *line;
-    line = gpiod_chip_get_line(chip, gpio);
-    if (!line)
+    printf("gpioSetMode called with gpio: %u, mode: %u\n", gpio, mode);
+    if (!gpio_num_is_valid(gpio))
     {
-        printf("Get line %u failed \n", gpio);
+        printf("Invalid GPIO number: %u\n", gpio);
         return -1;
     }
+    printf("Setting GPIO %u to mode %u\n", gpio, mode);
     if (mode == PI_INPUT)
-    {
-        int ret = gpiod_line_request_input(line, CONSUMER);
-        if (ret < 0)
-        {
-            printf("Request line %u as input failed\n", gpio);
-            gpiod_line_release(line);
-            return -1;
-        }
-    }
+        gpio_set_fsel(gpio, GPIO_FSEL_INPUT);
     else if (mode == PI_OUTPUT)
     {
-        int ret = gpiod_line_request_output(line, CONSUMER, 0);
-        if (ret < 0)
-        {
-            printf("Request line %u as output failed\n", gpio);
-            gpiod_line_release(line);
-            return -1;
-        }
+        gpio_set_fsel(gpio, GPIO_FSEL_OUTPUT);
+        gpio_set_drive(gpio,  DRIVE_HIGH); // Default to low drive
     }
     else
     {
-        printf("Invalid mode %u for GPIO %u\n", mode, gpio);
-        gpiod_line_release(line);
+        printf("Invalid mode: %u\n", mode);
         return -1;
     }
+    printf("GPIO %u set to mode %u successfully\n", gpio, mode);
     return 0; // Assuming success for now
 }
 int gpioWrite(unsigned gpio, unsigned level)
 {
-    struct gpiod_line *line;
-    line = gpiod_chip_get_line(chip, gpio);
-    if (gpiod_line_set_value(line, level) < 0)
+    printf("gpioWrite called with gpio: %u, level: %u\n", gpio, level);
+    if (!gpio_num_is_valid(gpio))
     {
-        printf("Could not set value %u on line #%u\n", level, gpio);
-        gpiod_line_release(line);
+        printf("Invalid GPIO number: %u\n", gpio);
+        return -1;
     }
-    return 0; // Assuming success for now
+    if (level)
+        gpio_set(gpio);
+    else
+        gpio_clear(gpio);
 }
 int gpioInitialise(void)
 {
-    char *chipname = "gpiochip0";
-    chip = gpiod_chip_open_by_name(chipname);
-    if (!chip)
+    gpiolib_set_verbose(&verbose_callback);
+    int ret = gpiolib_init();
+    if (ret < 0)
     {
-        printf("Open chip %s failed\n", chipname);
+        printf("Failed to initialise gpiolib - %d\n", ret);
         return -1;
     }
-    return 0;
+    printf("gpiolib initialised successfully with %d\n", ret);
 }
 
 int gpioSetISRFunc(
@@ -79,48 +73,13 @@ int gpioSetISRFunc(
     int ret;
     struct timespec ts = {10, 0}; // 10 seconds timeout
     printf("gpioSetISRFunc called with gpio: %u, edge: %u, timeout: %d\n", gpio, edge, timeout);
-    line = gpiod_chip_get_line(chip, gpio);
-    if (!line)
-    {
-        printf("Get line failed\n");
-        ret = -1;
-    }
-
-    ret = gpiod_line_request_rising_edge_events(line, CONSUMER);
-    if (ret < 0)
-    {
-        printf("Request event notification failed\n");
-        ret = -1;
-    }
-
-    ret = gpiod_line_event_wait(line, &ts);
-    if (ret < 0)
-    {
-        printf("Wait event notification failed\n");
-        ret = -1;
-    }
-    else if (ret == 0)
-    {
-        printf("Wait event notification on line #%u timeout\n", gpio);
-    }
-    else if (ret == 0)
-    {
-        struct gpiod_line_event event;
-        ret = gpiod_line_event_read(line, &event);
-        printf("Get event notification on line #%u\n", gpio);
-        if (ret < 0)
-        {
-            printf("Read last event notification failed\n");
-            ret = -1;
-        }
-    }
 
     return 0; // Assuming success for now
 }
 
 typedef struct line_wait_args
 {
-    struct gpiod_line *line;
+    unsigned gpio;
     struct timespec *ts;
     int edge;
     int ret;
@@ -129,29 +88,7 @@ typedef struct line_wait_args
 static void *run(void *arg)
 {
     line_wait_args *args = (line_wait_args *)arg;
-    printf("Waiting for event on line #%u\n", gpiod_line_offset(args->line));
-    int ret = gpiod_line_event_wait(args->line, args->ts);
-    if (ret < 0)
-    {
-        printf("Wait event notification failed\n");
-        ret = -1;
-    }
-    else if (ret == 0)
-    {
-        printf("Wait event notification on line #%u timeout\n", gpiod_line_offset(args->line));
-    }
-    else
-    {
-        struct gpiod_line_event event;
-        ret = gpiod_line_event_read(args->line, &event);
-        printf("Get event notification on line #%u\n", gpiod_line_offset(args->line));
-        if (ret < 0)
-        {
-            printf("Read last event notification failed\n");
-            ret = -1;
-        }
-    }
-    args->ret = ret;
+    args->ret = 0;
     return NULL;
 }
 
@@ -168,11 +105,11 @@ static void *run_manual_line_read(void *arg)
 
     gettimeofday(&rawtime1, NULL);
     line_wait_args *args = (line_wait_args *)arg;
-    //printf("Manually waiting for event on line #%u for %u seconds\n", gpiod_line_offset(args->line), args->ts->tv_sec);
+    // printf("Manually waiting for event on line #%u for %u seconds\n", gpiod_line_offset(args->line), args->ts->tv_sec);
     int ret;
     if (args->edge == RISING_EDGE)
     {
-        while (gpiod_line_get_value(args->line) == 0)
+        while (gpio_get_level(args->gpio) == 0)
         {
             nanosleep(&ts_wait_step, 0); // Sleep for 1000 microseconds
             gettimeofday(&rawtime2, NULL);
@@ -202,13 +139,13 @@ static void *run_manual_line_read(void *arg)
             }
         }
         if (!timeout)
-            printf("Rising edge detected on line #%u\n", gpiod_line_offset(args->line));
+            printf("Rising edge detected on line #%u\n", args->gpio);
         else
-            printf("Timeout waiting for rising edge on line #%u\n", gpiod_line_offset(args->line));
+            printf("Timeout waiting for rising edge on line #%u\n", args->gpio);
     }
     else if (args->edge == FALLING_EDGE)
     {
-        while (gpiod_line_get_value(args->line) == 1)
+        while (gpio_get_level(args->gpio) == 1)
         {
             gettimeofday(&rawtime2, 0);
             uint64_t delta_time = rawtime2.tv_usec - rawtime1.tv_usec;
@@ -219,13 +156,13 @@ static void *run_manual_line_read(void *arg)
             }
         }
         if (!timeout)
-            printf("Falling edge detected on line #%u\n", gpiod_line_offset(args->line));
+            printf("Falling edge detected on line #%u\n", args->gpio);
         else
-            printf("Timeout waiting for falling edge on line #%u\n", gpiod_line_offset(args->line));
+            printf("Timeout waiting for falling edge on line #%u\n", args->gpio);
     }
     else
     {
-        printf("Invalid edge %u for GPIO %u\n", args->edge, gpiod_line_offset(args->line));
+        printf("Invalid edge %u for GPIO %u\n", args->edge, args->gpio);
         args->ret = -1;
         return NULL;
     }
@@ -241,38 +178,8 @@ int gpioSetISRFuncEx(
     void *userdata,
     pthread_t *thread)
 {
-    struct gpiod_line *line;
     int ret;
     printf("gpioSetISRFuncEx called with gpio: %u, edge: %u, timeout: %d, userdata: %p\n", gpio, edge, timeout, userdata);
-    line = gpiod_chip_get_line(chip, gpio);
-    if (!line)
-    {
-        printf("Get line failed\n");
-        return -1;
-    }
-
-    // if (edge == RISING_EDGE)
-    // {
-    //     ret = gpiod_line_request_rising_edge_events(line, CONSUMER);
-    //     printf("Request rising edge events on line #%u\n", gpiod_line_offset(line));
-    // }
-    // else if (edge == FALLING_EDGE)
-    // {
-    //     ret = gpiod_line_request_falling_edge_events(line, CONSUMER);
-    //     printf("Request falling edge events on line #%u\n", gpiod_line_offset(line));
-    // }
-    // else
-    // {
-    //     printf("Invalid edge %u for GPIO %u\n", edge, gpio);
-    //     gpiod_line_release(line);
-    //     return -1;
-    // }
-    // if (ret < 0)
-    // {
-    //     printf("Request event notification failed\n");
-    //     gpiod_line_release(line);
-    //     return -1;
-    // }
     // we can't be allocating this on the stack because it will be used in a thread
     // and the thread will be using it after this function returns
     line_wait_args *args = malloc(sizeof(line_wait_args));
@@ -281,7 +188,7 @@ int gpioSetISRFuncEx(
         printf("Failed to allocate memory for line_wait_args\n");
         return -1;
     }
-    args->line = line;
+    args->gpio = gpio;
     struct timespec *ts = malloc(sizeof(struct timespec));
     if (!ts)
     {
@@ -292,7 +199,7 @@ int gpioSetISRFuncEx(
     *ts = (struct timespec){5, 0}; // 10 seconds timeout
     args->ts = ts;
     args->edge = edge;
-    
+
     pthread_create(thread, NULL, run_manual_line_read, (void *)args);
 
     return 0; // Assuming success for now

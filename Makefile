@@ -35,7 +35,7 @@ tx_explicit_example.o: tx_explicit_example.c
 # 	gcc -o pong pong.o LoRa.o  -lrt -pthread -lm
 	
 transmit_explicit: LoRa.o tx_explicit_example.o mySPI.o  mygpio.o
-	gcc -o transmit_explicit tx_explicit_example.o LoRa.o mygpio.o mySPI.o  -lrt -pthread -lm -lwiringPi -lgpiod
+	gcc -g -o transmit_explicit tx_explicit_example.o LoRa.o mygpio.o mySPI.o  -lrt -pthread -lm -lwiringPi -l:libgpiolib.a
 
 # transmit_implicit: LoRa.o tx_implicit_example.o
 # 	gcc -o transmit_implicit tx_implicit_example.o LoRa.o  -lrt -pthread -lm
